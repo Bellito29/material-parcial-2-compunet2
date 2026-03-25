@@ -1,0 +1,710 @@
+Perfecto. Ahora sí ya tenemos lo importante: **el modelo real**. Y eso cambia todo.
+Las consultas no se inventan desde el aire; se construyen **siguiendo las relaciones del diagrama**.
+
+## Ataque principal
+
+Tu riesgo en el parcial no es “no saber Spring”. Tu riesgo es **no saber leer el grafo de entidades**.
+
+Si no ves esto:
+
+* desde qué entidad empiezas,
+* por qué relación navegas,
+* y cuál campo filtras,
+
+vas a escribir métodos incorrectos aunque “suenen bonitos”.
+
+---
+
+# 1) Cómo leer este modelo de verdad
+
+## Entidades
+
+Tienes estas 5:
+
+* `Country`
+* `Player`
+* `Club`
+* `Match`
+* `PlayerClub`
+
+---
+
+## Relaciones reales del diagrama
+
+### `Country -> Player`
+
+Un país tiene muchos jugadores.
+Cada jugador pertenece a un país.
+
+Entonces en Java sería algo como:
+
+```java
+@ManyToOne
+private Country country;
+```
+
+en `Player`.
+
+Y en `Country` opcionalmente:
+
+```java
+@OneToMany(mappedBy = "country")
+private List<Player> players;
+```
+
+---
+
+### `Country -> Club`
+
+Un país tiene muchos clubes.
+Cada club pertenece a un país.
+
+---
+
+### `Country -> Match` dos veces
+
+Aquí hay una trampa importante ⚠️
+
+`Match` tiene:
+
+* `home_country_id`
+* `away_country_id`
+
+Entonces `Match` se relaciona con `Country` **dos veces**:
+
+```java
+@ManyToOne
+@JoinColumn(name = "home_country_id")
+private Country homeCountry;
+
+@ManyToOne
+@JoinColumn(name = "away_country_id")
+private Country awayCountry;
+```
+
+Esto es clave para consultas sobre partidos.
+
+---
+
+### `Player <-> Club` mediante `PlayerClub`
+
+No es relación directa simple.
+Es una relación histórica con tabla intermedia.
+
+`PlayerClub` guarda:
+
+* `player`
+* `club`
+* `startDate`
+* `endDate`
+
+Eso significa:
+
+* un jugador puede pasar por varios clubes,
+* un club puede tener muchos jugadores,
+* y puedes saber **cuándo** jugó ahí.
+
+Entonces **“actualmente juega”** normalmente significa:
+
+```java
+endDate IS NULL
+```
+
+o algo parecido.
+
+---
+
+# 2) Cómo pensar una consulta en examen
+
+Haz siempre estas 4 preguntas:
+
+### A. ¿Qué me están pidiendo devolver?
+
+Eso define el repositorio base.
+
+* jugadores → `PlayerRepository`
+* clubes → `ClubRepository`
+* partidos → `MatchRepository`
+
+### B. ¿Qué condiciones hay?
+
+Ejemplo:
+
+* confederación específica
+* nombre del jugador ignorando mayúsculas
+* entre fechas
+* estadio específico
+* fifaScore mayor que X
+
+### C. ¿Por qué relaciones debo pasar?
+
+Ejemplo:
+
+* `player.country.confederation`
+* `club.playerClubs.player.name`
+* `match.homeCountry.players.fifaScore`
+
+### D. ¿Hay extras?
+
+* `Top8`
+* `Top5`
+* `OrderBy...Desc`
+* `IgnoreCase`
+* `Between`
+* `GreaterThan`
+* `Distinct`
+
+---
+
+# 3) Traduciendo tus consultas con ESTE modelo
+
+---
+
+## Consulta 1
+
+**Obtener los jugadores de una confederación específica, ordenados por `fifa_score` descendente. Solo los primeros 8.**
+
+### Qué devuelve
+
+Jugadores → `PlayerRepository`
+
+### Ruta lógica
+
+`Player -> country -> confederation`
+
+### Método
+
+```java
+List<Player> findTop8ByCountry_ConfederationOrderByFifaScoreDesc(String confederation);
+```
+
+### Por qué
+
+Porque partes desde `Player` y filtras por:
+
+```text
+player.country.confederation
+```
+
+y ordenas por:
+
+```text
+player.fifaScore desc
+```
+
+---
+
+## Consulta 2
+
+**Obtener los clubes donde actualmente juega un jugador dado un nombre, ignorando mayúsculas. Ordenados por código de distrito...**
+Ojo: en tu modelo **no existe “código de distrito”**. Existe `city`. Entonces o el enunciado es de otro parcial, o aquí sería por `city` o por `country.code`.
+
+### Ataque principal
+
+No puedes escribir una consulta correcta si el enunciado pide un campo que **no existe en el modelo**.
+
+Aquí tendrías que adaptar.
+Si quisieran ordenar por código del país del club:
+
+### Qué devuelve
+
+Clubes → `ClubRepository`
+
+### Ruta lógica
+
+`Club -> playerClubs -> player -> name`
+y además “actualmente juega” = `endDate is null`
+
+### Método posible
+
+```java
+List<Club> findTop5DistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNullOrderByCountry_CodeAsc(String name);
+```
+
+### Explicación brutal
+
+Esto significa:
+
+* devuelve clubes
+* donde algún `playerClub`
+* tenga un `player.name = name`
+* ignorando mayúsculas
+* y `endDate` sea nulo, o sea, sigue en ese club
+* ordenado por `club.country.code`
+
+### Si quieres ordenar por ciudad:
+
+```java
+List<Club> findTop5DistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNullOrderByCityAsc(String name);
+```
+
+---
+
+## Consulta 3
+
+**Obtener los partidos jugados en un estadio específico, donde el país local tenga al menos un jugador con `fifaScore` mayor a un valor dado.**
+
+### Qué devuelve
+
+Partidos → `MatchRepository`
+
+### Ruta lógica
+
+`Match -> stadium`
+`Match -> homeCountry -> players -> fifaScore`
+
+### Método
+
+```java
+List<Match> findDistinctByStadiumAndHomeCountry_Players_FifaScoreGreaterThan(String stadium, Integer fifaScore);
+```
+
+### Por qué `Distinct`
+
+Porque si el país local tiene varios jugadores con score mayor al valor, el mismo partido puede salir repetido.
+
+---
+
+## Consulta 4
+
+**Obtener los clubes donde sus jugadores jueguen entre dos fechas específicas y en un estadio específico.**
+
+Aquí toca pensar, no improvisar.
+
+### Ataque principal
+
+La palabra “jueguen” no conecta directamente con `Club`, porque los partidos se juegan por países, no por clubes.
+
+Entonces la lógica correcta sería:
+
+* un `Club` tiene jugadores por `PlayerClub`
+* esos jugadores pertenecen a un `Country`
+* los `Match` se juegan por `Country`
+* entonces buscas clubes cuyos jugadores pertenecen a países que jugaron partidos en cierto estadio y entre ciertas fechas
+
+Eso es mucho más complejo.
+
+### Ruta conceptual
+
+`Club -> playerClubs -> player -> country`
+y luego ese `country` debe ser:
+
+* `match.homeCountry`
+  **o**
+* `match.awayCountry`
+
+### Problema real
+
+Una derived query aquí se vuelve horrible, porque necesitas cubrir **homeCountry OR awayCountry**.
+
+Con puro nombre de método podría ser algo monstruoso, por ejemplo dos métodos:
+
+```java
+List<Club> findDistinctByPlayerClubs_Player_Country_HomeMatches_StadiumAndPlayerClubs_Player_Country_HomeMatches_MatchDateBetween(String stadium, LocalDate start, LocalDate end);
+```
+
+Pero eso depende de que hayas modelado en `Country` algo como:
+
+```java
+@OneToMany(mappedBy = "homeCountry")
+private List<Match> homeMatches;
+
+@OneToMany(mappedBy = "awayCountry")
+private List<Match> awayMatches;
+```
+
+Y aun así faltaría unir ambos lados.
+
+### Conclusión correcta
+
+Esta consulta **es mejor hacerla con `@Query`**, no con derived query.
+
+Ejemplo conceptual:
+
+```java
+@Query("""
+SELECT DISTINCT c
+FROM Club c
+JOIN c.playerClubs pc
+JOIN pc.player p
+JOIN Match m
+ON m.homeCountry = p.country OR m.awayCountry = p.country
+WHERE m.stadium = :stadium
+AND m.matchDate BETWEEN :start AND :end
+""")
+List<Club> findClubsWithPlayersInMatchesBetweenDatesAndStadium(
+    String stadium,
+    LocalDate start,
+    LocalDate end
+);
+```
+
+---
+
+## Consulta 5
+
+**Obtener los partidos en los que participan jugadores con posición de delantero pertenecientes a un club específico.**
+
+### Qué devuelve
+
+Partidos → `MatchRepository`
+
+### Ruta lógica real
+
+Un jugador participa en partidos de su país.
+Entonces:
+
+* `Match.homeCountry.players`
+* `Match.awayCountry.players`
+
+y además esos jugadores:
+
+* tienen `position = "Forward"` o `"Delantero"`
+* pertenecen a cierto club por `PlayerClub`
+
+### Ataque principal
+
+Otra vez tienes dos lados: home y away.
+Eso ya te empuja a `@Query`.
+
+### Con `@Query`
+
+```java
+@Query("""
+SELECT DISTINCT m
+FROM Match m
+WHERE EXISTS (
+    SELECT pc
+    FROM PlayerClub pc
+    JOIN pc.player p
+    JOIN pc.club c
+    WHERE c.name = :clubName
+      AND p.position = :position
+      AND pc.endDate IS NULL
+      AND (p.country = m.homeCountry OR p.country = m.awayCountry)
+)
+""")
+List<Match> findMatchesWithForwardPlayersFromClub(String clubName, String position);
+```
+
+### ¿Se podría con derived query?
+
+Podrías intentar algo con dos métodos separados, uno por `homeCountry` y otro por `awayCountry`, pero ya se vuelve torpe. En examen, si te exigen derived query pura, entonces el modelo manda. Si te permiten JPQL, aquí **JPQL gana por goleada**.
+
+---
+
+# 4) Qué consultas SÍ son cómodas con derived methods
+
+Con este modelo, estas salen limpias:
+
+### Jugadores por país
+
+```java
+List<Player> findByCountry_Name(String countryName);
+```
+
+### Jugadores por confederación
+
+```java
+List<Player> findByCountry_Confederation(String confederation);
+```
+
+### Jugadores top por score
+
+```java
+List<Player> findTop10ByOrderByFifaScoreDesc();
+```
+
+### Clubes por país
+
+```java
+List<Club> findByCountry_Code(String code);
+```
+
+### Partidos por estadio
+
+```java
+List<Match> findByStadium(String stadium);
+```
+
+### Partidos entre fechas
+
+```java
+List<Match> findByMatchDateBetween(LocalDate start, LocalDate end);
+```
+
+### Clubes actuales de un jugador
+
+```java
+List<Club> findDistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNull(String name);
+```
+
+---
+
+# 5) Qué debes entender de `PlayerClub`
+
+Esta entidad no es adorno. Es la clave del parcial.
+
+## Lo que representa
+
+No dice solo “jugador pertenece a club”.
+Dice:
+
+* **a qué club**
+* **desde cuándo**
+* **hasta cuándo**
+
+Entonces consultas como:
+
+* actual club,
+* clubes históricos,
+* jugadores de un club en una fecha,
+* clubes donde jugó entre fechas,
+
+salen de aquí.
+
+## Ejemplos útiles
+
+### Clubes actuales de un jugador
+
+```java
+List<Club> findDistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNull(String name);
+```
+
+### Jugadores actuales de un club
+
+```java
+List<Player> findDistinctByPlayerClubs_Club_NameAndPlayerClubs_EndDateIsNull(String clubName);
+```
+
+### Jugadores de un club entre fechas
+
+```java
+List<Player> findDistinctByPlayerClubs_Club_NameAndPlayerClubs_StartDateLessThanEqualAndPlayerClubs_EndDateGreaterThanEqual(
+    String clubName,
+    LocalDate end,
+    LocalDate start
+);
+```
+
+Aunque aquí ya hay que pensar bien la lógica del cruce de fechas.
+
+---
+
+# 6) Regla de oro para derived queries
+
+Cuando veas una consulta, conviértela así:
+
+## Ejemplo:
+
+“jugadores de una confederación”
+
+1. Devuelve jugadores → `PlayerRepository`
+2. confederación está en `Country`
+3. `Player -> Country -> Confederation`
+
+Resultado:
+
+```java
+findByCountry_Confederation(...)
+```
+
+---
+
+## Otro ejemplo:
+
+“clubes donde actualmente juega un jugador llamado Messi”
+
+1. Devuelve clubes → `ClubRepository`
+2. `Club -> PlayerClub -> Player -> Name`
+3. actual = `PlayerClub.endDate is null`
+
+Resultado:
+
+```java
+findDistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNull(...)
+```
+
+---
+
+# 7) Cuándo derived query ya no vale la pena
+
+No seas terco.
+
+Usa `@Query` cuando:
+
+* hay muchos `OR`
+* debes cubrir dos relaciones paralelas (`homeCountry` y `awayCountry`)
+* necesitas `EXISTS`
+* necesitas `JOIN` manual
+* el nombre del método queda monstruoso
+* el modelo obliga a pasar por varias entidades y condiciones temporales
+
+En este modelo, las consultas 4 y 5 ya huelen a `@Query`.
+La 3 todavía puede sobrevivir con derived query.
+La 1 y 2 sí son totalmente razonables como derived query.
+
+---
+
+# 8) Tu mapa mental para este modelo
+
+## `PlayerRepository`
+
+Úsalo para consultas que devuelvan jugadores.
+
+Rutas frecuentes:
+
+* `country.name`
+* `country.code`
+* `country.confederation`
+* `fifaScore`
+* `position`
+
+---
+
+## `ClubRepository`
+
+Úsalo para consultas que devuelvan clubes.
+
+Rutas frecuentes:
+
+* `country.name`
+* `country.code`
+* `playerClubs.player.name`
+* `playerClubs.endDate`
+
+---
+
+## `MatchRepository`
+
+Úsalo para consultas que devuelvan partidos.
+
+Rutas frecuentes:
+
+* `stadium`
+* `matchDate`
+* `homeCountry`
+* `awayCountry`
+* `homeCountry.players`
+* `awayCountry.players`
+
+---
+
+## `PlayerClubRepository`
+
+Úsalo cuando la consulta realmente gira alrededor de la afiliación club-jugador y fechas.
+
+Rutas frecuentes:
+
+* `player.name`
+* `club.name`
+* `startDate`
+* `endDate`
+
+---
+
+# 9) Las 5 respuestas, condensadas
+
+### 1
+
+```java
+List<Player> findTop8ByCountry_ConfederationOrderByFifaScoreDesc(String confederation);
+```
+
+### 2
+
+```java
+List<Club> findTop5DistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNullOrderByCountry_CodeAsc(String name);
+```
+
+### 3
+
+```java
+List<Match> findDistinctByStadiumAndHomeCountry_Players_FifaScoreGreaterThan(String stadium, Integer fifaScore);
+```
+
+### 4
+
+Mejor con `@Query`
+
+### 5
+
+Mejor con `@Query`
+
+---
+
+# 10) Preguntas de presión
+
+1. **Sabes distinguir cuándo una consulta sale desde `Club` y cuándo realmente debería salir desde `PlayerClub`?**
+   Porque ahí muchos se equivocan.
+
+2. **Entendiste que `Match` no se relaciona con `Player` directamente, sino a través de `Country`?**
+   Ese detalle define medio parcial.
+
+3. **Tienes claro que “actualmente juega” casi seguro significa `endDate IS NULL`?**
+   Porque si no metes eso, la consulta queda mal aunque compile.
+
+---
+
+# Versión más sólida
+
+Lo mejor que puedes hacer ahora no es leer más teoría. Es practicar la traducción.
+
+Mándame 5 consultas más basadas en este mismo diagrama, o te las invento yo estilo parcial, y te obligo a resolverlas una por una.
+
+Fórmula general que estás usando
+
+Este método sigue esta estructura:
+
+findAllBy[relación]_[campo]OrderBy[campoDeOrden][Asc/Desc]
+
+En tu caso:
+
+findAllByDrone_CodeOrderByRecordedAtAsc
+
+se ajusta a:
+
+findAll
+ByDrone_Code
+OrderByRecordedAtAsc
+Cómo pensar uno igual desde cero
+
+Si te ponen el enunciado otra vez, así lo construyes:
+
+Paso 1: ¿Qué quieres devolver?
+
+DronePosition
+
+Entonces el método va en IDronePositionRepository.
+
+Paso 2: ¿Cuál es el filtro?
+
+Por código del dron.
+
+En DronePosition, el código no está directo. Está en:
+
+drone.code
+
+Entonces escribes:
+
+ByDrone_Code
+Paso 3: ¿Cómo quieres el orden?
+
+Por tiempo.
+
+En tu modelo, el tiempo es:
+
+recordedAt
+
+y quieres recorrido cronológico:
+
+OrderByRecordedAtAsc
+Paso 4: Lo unes todo
+findAllByDrone_CodeOrderByRecordedAtAsc
+Si el enunciado cambiara, cambiaría el nombre
+Si pidieran por ID del dron:
+findAllByDrone_IdOrderByRecordedAtAsc(Long id)
+Si pidieran las más recientes primero:
+findAllByDrone_CodeOrderByRecordedAtDesc(String code)
+Si pidieran solo las primeras 10:
+findTop10ByDrone_CodeOrderByRecordedAtAsc(String code)
