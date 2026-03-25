@@ -1,0 +1,419 @@
+Ataque principal: si solo quieres “una lista grande” para memorizar, estás estudiando mal. Eso sirve para reconocer patrones, pero no para resolver cuando te cambien una relación o un campo. Aun así, te la doy porque te puede servir como banco de práctica.
+
+Te voy a dar muchas combinaciones **tipo parcial**, usando el estilo de Spring Data JPA derivado por nombre de método. Las agrupo por dificultad para que no mezcles lo básico con lo que ya empieza a oler a `@Query`.
+
+---
+
+# 1. Consultas simples por campo directo
+
+### Drone
+
+```java
+findByCode(String code)
+findByStatus(String status)
+findAllByBatteryLevel(Integer batteryLevel)
+findAllByBatteryLevelGreaterThan(Integer batteryLevel)
+findAllByBatteryLevelLessThan(Integer batteryLevel)
+findAllByModel(String model)
+findAllBySerialNumber(String serialNumber)
+findTop5ByOrderByBatteryLevelDesc()
+findTop10ByOrderByCreatedAtAsc()
+findAllByStatusOrderByBatteryLevelDesc(String status)
+```
+
+### Delivery
+
+```java
+findByTrackingCode(String trackingCode)
+findAllByStatus(String status)
+findAllByPriority(String priority)
+findAllByCreatedAtBetween(LocalDateTime start, LocalDateTime end)
+findAllByDeliveredAtIsNull()
+findAllByDeliveredAtIsNotNull()
+findAllByStatusOrderByCreatedAtAsc(String status)
+findTop5ByStatusOrderByDeliveredAtDesc(String status)
+findAllByWeightGreaterThan(Double weight)
+findAllByWeightBetween(Double min, Double max)
+```
+
+### DronePosition
+
+```java
+findAllByRecordedAtBetween(LocalDateTime start, LocalDateTime end)
+findTop10ByOrderByRecordedAtDesc()
+findAllByLatitudeGreaterThan(Double latitude)
+findAllByLongitudeLessThan(Double longitude)
+findAllByRecordedAtAfter(LocalDateTime date)
+findAllByRecordedAtBefore(LocalDateTime date)
+findAllByOrderByRecordedAtAsc()
+findAllByOrderByRecordedAtDesc()
+```
+
+### DroneEvent
+
+```java
+findAllByEventType(String eventType)
+findAllByOccurredAtBetween(LocalDateTime start, LocalDateTime end)
+findAllBySeverity(String severity)
+findTop5ByOrderByOccurredAtDesc()
+findAllByMessageContainingIgnoreCase(String text)
+```
+
+---
+
+# 2. Consultas por relación simple
+
+### Deliveries de un dron
+
+```java
+findAllByDrone_Id(Long id)
+findAllByDrone_Code(String code)
+findAllByDrone_Status(String status)
+findAllByDrone_Model(String model)
+findAllByDrone_CodeAndStatus(String code, String status)
+findAllByDrone_CodeOrderByCreatedAtAsc(String code)
+findAllByDrone_CodeOrderByDeliveredAtDesc(String code)
+findTop5ByDrone_CodeOrderByCreatedAtDesc(String code)
+```
+
+### Positions de un dron
+
+```java
+findAllByDrone_IdOrderByRecordedAtAsc(Long id)
+findAllByDrone_CodeOrderByRecordedAtAsc(String code)
+findAllByDrone_CodeOrderByRecordedAtDesc(String code)
+findTop10ByDrone_CodeOrderByRecordedAtDesc(String code)
+findAllByDrone_StatusAndRecordedAtAfter(String status, LocalDateTime date)
+```
+
+### Events de un dron
+
+```java
+findAllByDrone_Id(Long id)
+findAllByDrone_Code(String code)
+findAllByDrone_CodeOrderByOccurredAtAsc(String code)
+findAllByDrone_CodeAndEventType(String code, String eventType)
+findTop5ByDrone_CodeOrderByOccurredAtDesc(String code)
+findAllByDrone_StatusAndSeverity(String status, String severity)
+```
+
+---
+
+# 3. Consultas con dos o más filtros
+
+```java
+findAllByDrone_CodeAndStatus(String code, String status)
+findAllByDrone_CodeAndPriority(String code, String priority)
+findAllByDrone_CodeAndCreatedAtBetween(String code, LocalDateTime start, LocalDateTime end)
+findAllByDrone_CodeAndDeliveredAtIsNull(String code)
+findAllByDrone_CodeAndWeightGreaterThan(String code, Double weight)
+findAllByStatusAndPriority(String status, String priority)
+findAllByStatusAndCreatedAtBetween(String status, LocalDateTime start, LocalDateTime end)
+findAllByPriorityAndWeightBetween(String priority, Double min, Double max)
+findAllByDrone_StatusAndStatus(String droneStatus, String deliveryStatus)
+findAllByDrone_ModelAndStatus(String model, String status)
+```
+
+---
+
+# 4. Consultas con ordenamiento
+
+```java
+findAllByStatusOrderByCreatedAtAsc(String status)
+findAllByStatusOrderByCreatedAtDesc(String status)
+findAllByDrone_CodeOrderByRecordedAtAsc(String code)
+findAllByDrone_CodeOrderByRecordedAtDesc(String code)
+findAllByPriorityOrderByWeightDesc(String priority)
+findAllByDrone_StatusOrderByBatteryLevelDesc(String status)
+findAllByEventTypeOrderByOccurredAtDesc(String eventType)
+findAllByDrone_CodeAndStatusOrderByDeliveredAtAsc(String code, String status)
+findAllByDrone_CodeAndStatusOrderByDeliveredAtDesc(String code, String status)
+```
+
+---
+
+# 5. Consultas con Top / First
+
+```java
+findTop5ByStatusOrderByCreatedAtDesc(String status)
+findTop10ByDrone_CodeOrderByRecordedAtDesc(String code)
+findFirstByDrone_CodeOrderByRecordedAtAsc(String code)
+findFirstByDrone_CodeOrderByRecordedAtDesc(String code)
+findTop3ByPriorityOrderByWeightDesc(String priority)
+findTop8ByDrone_StatusOrderByBatteryLevelDesc(String status)
+findTop5ByEventTypeOrderByOccurredAtDesc(String eventType)
+findFirstByStatusOrderByDeliveredAtDesc(String status)
+```
+
+---
+
+# 6. Consultas con IgnoreCase / Containing / Like mental
+
+```java
+findAllByDrone_CodeIgnoreCase(String code)
+findAllByRecipientNameIgnoreCase(String recipientName)
+findAllByRecipientNameContainingIgnoreCase(String text)
+findAllByAddressContainingIgnoreCase(String text)
+findAllByMessageContainingIgnoreCase(String text)
+findAllByDrone_ModelContainingIgnoreCase(String text)
+findAllByStatusIgnoreCase(String status)
+findAllByPriorityIgnoreCase(String priority)
+```
+
+---
+
+# 7. Consultas con IsNull / IsNotNull
+
+```java
+findAllByDeliveredAtIsNull()
+findAllByDeliveredAtIsNotNull()
+findAllByDrone_IdAndDeliveredAtIsNull(Long id)
+findAllByDrone_CodeAndDeliveredAtIsNull(String code)
+findAllByDrone_CodeAndDeliveredAtIsNotNull(String code)
+findAllByEndDateIsNull()
+findAllByEndDateIsNotNull()
+findAllByPlayerClubs_EndDateIsNull()
+findAllByPlayerClubs_EndDateIsNotNull()
+```
+
+---
+
+# 8. Consultas con Between / Before / After / GreaterThan / LessThan
+
+```java
+findAllByCreatedAtBetween(LocalDateTime start, LocalDateTime end)
+findAllByDeliveredAtBetween(LocalDateTime start, LocalDateTime end)
+findAllByRecordedAtBetween(LocalDateTime start, LocalDateTime end)
+findAllByOccurredAtBetween(LocalDateTime start, LocalDateTime end)
+
+findAllByCreatedAtAfter(LocalDateTime date)
+findAllByCreatedAtBefore(LocalDateTime date)
+findAllByRecordedAtAfter(LocalDateTime date)
+findAllByOccurredAtBefore(LocalDateTime date)
+
+findAllByBatteryLevelGreaterThan(Integer batteryLevel)
+findAllByBatteryLevelLessThan(Integer batteryLevel)
+findAllByWeightGreaterThan(Double weight)
+findAllByWeightLessThan(Double weight)
+findAllByHomeCountry_Players_FifaScoreGreaterThan(Integer score)
+findAllByHomeCountry_Players_FifaScoreLessThan(Integer score)
+```
+
+---
+
+# 9. Consultas con Distinct
+
+Estas son importantes porque en relaciones con listas se repiten registros.
+
+```java
+findDistinctByDrone_Code(String code)
+findDistinctByStadiumAndHomeCountry_Players_FifaScoreGreaterThan(String stadium, Integer score)
+findDistinctByPlayerClubs_Player_NameIgnoreCase(String name)
+findDistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNull(String name)
+findDistinctByCountry_Confederation(String confederation)
+findDistinctByHomeCountry_NameOrAwayCountry_Name(String home, String away)
+findDistinctByDrone_CodeAndStatus(String code, String status)
+```
+
+---
+
+# 10. Ejemplos estilo fútbol como los que te pusieron
+
+## PlayerRepository
+
+```java
+findTop8ByCountry_ConfederationOrderByFifaScoreDesc(String confederation)
+findAllByCountry_NameOrderByFifaScoreDesc(String countryName)
+findAllByPosition(String position)
+findAllByPositionIgnoreCase(String position)
+findAllByCountry_CodeAndPosition(String code, String position)
+findAllByCountry_ConfederationAndFifaScoreGreaterThan(String confederation, Integer score)
+findTop5ByPositionOrderByFifaScoreDesc(String position)
+findAllByNameIgnoreCase(String name)
+findAllByNameContainingIgnoreCase(String text)
+findAllByCountry_NameAndPosition(String countryName, String position)
+```
+
+## ClubRepository
+
+```java
+findAllByCountry_Code(String code)
+findAllByCountry_NameOrderByNameAsc(String countryName)
+findTop5DistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNullOrderByCountry_CodeAsc(String name)
+findDistinctByPlayerClubs_Player_NameIgnoreCase(String name)
+findDistinctByPlayerClubs_Player_Position(String position)
+findDistinctByPlayerClubs_Player_Country_Confederation(String confederation)
+findDistinctByPlayerClubs_StartDateBetween(LocalDate start, LocalDate end)
+findDistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNull(String name)
+```
+
+## MatchRepository
+
+```java
+findAllByStadium(String stadium)
+findAllByMatchDateBetween(LocalDate start, LocalDate end)
+findAllByHomeCountry_Name(String name)
+findAllByAwayCountry_Name(String name)
+findDistinctByStadiumAndHomeCountry_Players_FifaScoreGreaterThan(String stadium, Integer score)
+findDistinctByHomeCountry_Players_Position(String position)
+findDistinctByAwayCountry_Players_Position(String position)
+findDistinctByHomeCountry_NameOrAwayCountry_Name(String homeCountry, String awayCountry)
+findAllByStadiumAndMatchDateBetween(String stadium, LocalDate start, LocalDate end)
+findTop10ByOrderByMatchDateDesc()
+```
+
+## PlayerClubRepository
+
+```java
+findAllByPlayer_NameIgnoreCase(String name)
+findAllByClub_NameIgnoreCase(String name)
+findAllByEndDateIsNull()
+findAllByStartDateBetween(LocalDate start, LocalDate end)
+findAllByClub_NameAndEndDateIsNull(String clubName)
+findAllByPlayer_NameIgnoreCaseAndEndDateIsNull(String playerName)
+findAllByClub_NameAndStartDateBefore(String clubName, LocalDate date)
+findAllByPlayer_NameIgnoreCaseAndStartDateBetween(String playerName, LocalDate start, LocalDate end)
+findAllByClub_Country_Code(String code)
+findAllByPlayer_Country_Confederation(String confederation)
+```
+
+---
+
+# 11. Combinaciones más pesadas pero todavía posibles
+
+```java
+findAllByDrone_CodeAndStatusAndCreatedAtBetween(String code, String status, LocalDateTime start, LocalDateTime end)
+findTop5ByDrone_StatusAndStatusOrderByDeliveredAtDesc(String droneStatus, String deliveryStatus)
+findDistinctByStadiumAndHomeCountry_Players_PositionAndHomeCountry_Players_FifaScoreGreaterThan(
+    String stadium,
+    String position,
+    Integer score
+)
+findTop10DistinctByPlayerClubs_Player_Country_ConfederationOrderByPlayerClubs_Player_FifaScoreDesc(String confederation)
+findDistinctByPlayerClubs_Player_NameIgnoreCaseAndCountry_CodeAndPlayerClubs_EndDateIsNull(
+    String name,
+    String countryCode
+)
+findAllByDrone_ModelAndDrone_StatusAndStatusOrderByCreatedAtDesc(
+    String model,
+    String droneStatus,
+    String deliveryStatus
+)
+```
+
+---
+
+# 12. Consultas trampa que parecen válidas, pero debes pensarlas
+
+Estas pueden compilar conceptualmente, pero a veces ya piden `@Query` o se vuelven demasiado feas:
+
+```java
+findDistinctByHomeCountry_Players_PlayerClubs_Club_NameAndHomeCountry_Players_Position(String clubName, String position)
+findDistinctByAwayCountry_Players_PlayerClubs_EndDateIsNullAndAwayCountry_Players_FifaScoreGreaterThan(Integer score)
+findDistinctByPlayerClubs_Player_Country_HomeMatches_StadiumAndPlayerClubs_Player_Country_HomeMatches_MatchDateBetween(
+    String stadium, LocalDate start, LocalDate end
+)
+```
+
+Estas te las pongo no para que las memorices, sino para que entiendas cuándo el nombre empieza a ponerse ridículo y ya deberías pensar en `@Query`.
+
+---
+
+# 13. Plantillas que debes aprender de verdad
+
+## Filtro directo
+
+```java
+findAllByCampo(...)
+```
+
+## Filtro por relación
+
+```java
+findAllByRelacion_Campo(...)
+```
+
+## Dos filtros
+
+```java
+findAllByCampo1AndCampo2(...)
+```
+
+## Relación + filtro
+
+```java
+findAllByRelacion_CampoAndCampo2(...)
+```
+
+## Orden
+
+```java
+findAllByCampoOrderByOtroCampoAsc(...)
+findAllByCampoOrderByOtroCampoDesc(...)
+```
+
+## Límite
+
+```java
+findTop5ByCampoOrderByOtroCampoDesc(...)
+findFirstByCampoOrderByOtroCampoAsc(...)
+```
+
+## Texto
+
+```java
+findAllByCampoIgnoreCase(...)
+findAllByCampoContainingIgnoreCase(...)
+```
+
+## Rango
+
+```java
+findAllByCampoBetween(...)
+findAllByCampoGreaterThan(...)
+findAllByCampoLessThan(...)
+```
+
+## Nulos
+
+```java
+findAllByCampoIsNull()
+findAllByCampoIsNotNull()
+```
+
+## Sin repetidos
+
+```java
+findDistinctBy...
+```
+
+---
+
+# 14. Las que más te conviene practicar ya
+
+Si yo te quisiera endurecer para el parcial, te pondría a dominar estas 12 primero:
+
+```java
+findByCode(String code)
+findAllByStatus(String status)
+findAllByDrone_Code(String code)
+findAllByDrone_CodeAndStatus(String code, String status)
+findAllByDrone_CodeOrderByRecordedAtAsc(String code)
+findTop5ByStatusOrderByCreatedAtDesc(String status)
+findAllByCreatedAtBetween(LocalDateTime start, LocalDateTime end)
+findAllByRecipientNameContainingIgnoreCase(String text)
+findAllByDeliveredAtIsNull()
+findTop8ByCountry_ConfederationOrderByFifaScoreDesc(String confederation)
+findTop5DistinctByPlayerClubs_Player_NameIgnoreCaseAndPlayerClubs_EndDateIsNullOrderByCountry_CodeAsc(String name)
+findDistinctByStadiumAndHomeCountry_Players_FifaScoreGreaterThan(String stadium, Integer score)
+```
+
+---
+
+# Preguntas de presión
+
+1. ¿Quieres memorizar una lista o aprender a construirlas desde el modelo? Porque no es lo mismo y la segunda opción es la única robusta.
+2. ¿Distingues ya cuándo una consulta todavía es razonable por nombre y cuándo se vuelve candidata a `@Query`?
+3. ¿Sabes partir cada método en: límite, filtros, relaciones, orden y operadores?
+
+Versión más sólida: en el siguiente mensaje te puedo hacer un **simulacro de 20 consultas estilo examen**, donde yo te doy el enunciado y debajo te pongo la respuesta correcta en repository y controller.
